@@ -8,6 +8,7 @@ from rtrees.rtree_utils import IndexRecord
 from queue import PriorityQueue
 from dataclasses import dataclass, field
 from typing import Any
+import timeit
 
 
 class OrientedTP():
@@ -41,7 +42,6 @@ def getTangentPlane(points):
 def tangentPlanes(pc, tree, numNeighbors=15):
 
     tP = []
-
     for p in pc:
         nn = tree.NearestNeighbor(entry=TargetVertex(value=p), k=numNeighbors)
         nn = [r.tuple_identifier for r in nn]
@@ -234,11 +234,19 @@ class RiemanianGraph(EMST):
 
     def __init__(self, nodes, tree, k=15):
         self.vertices = nodes
+        self.longestEdge = -math.inf
 
         for v in self.vertices:
             kNN = tree.NearestNeighbor(v, k=k)
-            for p in kNN:
+            closest = False
+            for i in range(len(kNN)):
+                p = kNN[i]
                 if p != v:
+                    if not closest:
+                        closest = True
+                        dist = np.linalg.norm(p.tuple_identifier - v.tuple_identifier)
+                        if dist > self.longestEdge:
+                            self.longestEdge = dist
                     v.neighbors.append(p)
                     p.neighbors.append(v)
 
@@ -331,6 +339,108 @@ def fixOrientations(graph):
                 DFS(n)
 
     DFS(start)
+
+
+def getSDF(pc, tp, delta, ro):
+
+    pcTree = RTree(M=10, dim=3)
+    tpTree = RTree(M=10, dim=3)
+
+    for p in pc:
+        pcTree.Insert(IndexRecord(bound=None, tuple_identifier=p))
+
+    for p in tp:
+        tpTree.Insert(p)
+
+    def sdf(p):
+        tpNear = tpTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=p))[0].item
+        projNorm = np.dot(p - tpNear.center, tpNear.normal)
+        projP = p - projNorm * tpNear.normal
+
+        zNN = pcTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=projP))[0].tuple_identifier
+        if np.linalg.norm(projP - zNN) < delta + ro:
+            return projNorm
+
+        else:
+            return None
+
+    return sdf
+
+
+class PCtoSurface():
+    def __init__(self, pc, k=15):
+        self.pc = pc
+
+        pcTree = RTree(M=10, dim=3)
+        for p in pc:
+            pcTree.Insert(TargetVertex(value=p))
+
+        tP = tangentPlanes(pc=self.pc, tree=pcTree, numNeighbors=k)
+        self.tPNodes = [EMST.Node(tP[i].center, tP[i], i) for i in range(len(tP))]
+        self.centers = [p.center for p in tP]
+
+        tpTree = RTree(M=10, dim=3)
+        for tp in self.tPNodes:
+            tpTree.Insert(tp)
+
+        # emst = EMST(Graph(tPNodes), tree2)
+        # view.addItem(emst.visualizeEdges())
+
+        self.rG = RiemanianGraph(self.tPNodes, tpTree, k=k)
+        self.mst = self.rG.getMST(RiemanianGraph.Node.compareItems(OrientedTP.offset))
+        # view.addItem(rG.visualizeEdges())
+        # view.addItem(mst.visualizeEdges())
+
+        fixOrientations(self.mst)
+        self.normals = [p.normal for p in tP]
+
+        tpTree = RTree(M=10, dim=3)
+        for tp in self.tPNodes:
+            tpTree.Insert(tp)
+
+        self.sdf = getSDF(pc=self.pc, tp=self.tPNodes, delta=0, ro=self.rG.longestEdge / 2)
+
+    def getPoints(self):
+        return self.pc
+
+    def getTPCenters(self):
+        return self.centers
+
+    def getTPNormals(self):
+        return self.normals
+
+    def getRiemanianGraph(self):
+        return self.rG
+
+    def getTraversalMST(self):
+        return self.mst
+
+    def getSDF(self):
+        return self.sdf
+
+    def visualizePoints(self, view, color="#464141"):
+        visualizePC(view, self.pc, color=color)
+
+    def visualizeTPCenters(self, view, color="#464141"):
+        visualizePC(view, self.centers, color=color)
+
+    def visualizeTPNormals(self, view):
+        visualizeNormals(view, self.centers, self.normals)
+
+    def visualizeTP(self, view):
+        self.visualizeTPCenters(view)
+        self.visualizeTPNormals(view)
+
+    def visualizeRiemanianGraph(self, view):
+        view.addItem(self.rG.visualizeEdges())
+
+    def visualizeTraversalMST(self, view):
+        view.addItem(self.mst.visualizeEdges())
+
+
+
+
+
 
 
 
