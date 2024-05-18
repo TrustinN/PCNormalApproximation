@@ -1,14 +1,15 @@
 import math
 import numpy as np
 import pyqtgraph.opengl as gl
-from operator import itemgetter
 from colorutils import Color
 from rtrees.rstar_tree import RTree
 from rtrees.rtree_utils import IndexRecord
 from queue import PriorityQueue
 from dataclasses import dataclass, field
 from typing import Any
-import timeit
+from lookup import EdgeVertexIndices, TriangleTable, VertexPosition
+from rtrees.plot import plot_mesh
+from rtrees.rtree_utils import Cube
 
 
 class OrientedTP():
@@ -352,17 +353,17 @@ def getSDF(pc, tp, delta, ro):
     for p in tp:
         tpTree.Insert(p)
 
-    def sdf(p):
-        tpNear = tpTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=p))[0].item
-        projNorm = np.dot(p - tpNear.center, tpNear.normal)
-        projP = p - projNorm * tpNear.normal
+    def sdf(x):
+        tpNear = tpTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=x))[0].item
+        projNorm = np.dot(x - tpNear.center, tpNear.normal)
+        projX = x - projNorm * tpNear.normal
 
-        zNN = pcTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=projP))[0].tuple_identifier
-        if np.linalg.norm(projP - zNN) < delta + ro:
-            return projNorm
-
-        else:
-            return None
+        zNN = pcTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=projX))[0].tuple_identifier
+        # if np.linalg.norm(projX - zNN) < delta + ro:
+        return projNorm
+        #
+        # else:
+        #     return -math.inf
 
     return sdf
 
@@ -383,13 +384,8 @@ class PCtoSurface():
         for tp in self.tPNodes:
             tpTree.Insert(tp)
 
-        # emst = EMST(Graph(tPNodes), tree2)
-        # view.addItem(emst.visualizeEdges())
-
         self.rG = RiemanianGraph(self.tPNodes, tpTree, k=k)
         self.mst = self.rG.getMST(RiemanianGraph.Node.compareItems(OrientedTP.offset))
-        # view.addItem(rG.visualizeEdges())
-        # view.addItem(mst.visualizeEdges())
 
         fixOrientations(self.mst)
         self.normals = [p.normal for p in tP]
@@ -398,7 +394,10 @@ class PCtoSurface():
         for tp in self.tPNodes:
             tpTree.Insert(tp)
 
+        self.boundingBox = tpTree.root.covering
         self.sdf = getSDF(pc=self.pc, tp=self.tPNodes, delta=0, ro=self.rG.longestEdge / 2)
+
+        self.mesh = MarchingCubes(self, 1.2 * self.rG.longestEdge)
 
     def getPoints(self):
         return self.pc
@@ -436,6 +435,109 @@ class PCtoSurface():
 
     def visualizeTraversalMST(self, view):
         view.addItem(self.mst.visualizeEdges())
+
+    def visualizeSurface(self, view):
+        view.addItem(self.mesh)
+
+
+def MarchingCubes(surface, length):
+
+    def calcCubeIndex(cube):
+        sdfs = np.array(list(map(surface.getSDF(), cube.vertices)))
+        signs = sdfs >= 0
+        return sum([2 ** i for i in range(len(signs)) if signs[i]])
+
+    def interpolate(v1, v2):
+        w1 = abs(sdf(v1))
+        w2 = abs(sdf(v2))
+        scale = w1 / (w1 + w2)
+        v = scale * (v2 - v1) + v1
+        return v
+
+    def parseEdges(edges, pos):
+        rep = (len(edges) - 1) // 3 + 1
+        for i in range(rep):
+            idx = 3 * i
+            if edges[idx] == -1:
+                break
+
+            v00 = EdgeVertexIndices[edges[idx]][0]
+            v01 = EdgeVertexIndices[edges[idx]][1]
+
+            v10 = EdgeVertexIndices[edges[idx + 1]][0]
+            v11 = EdgeVertexIndices[edges[idx + 1]][1]
+
+            v20 = EdgeVertexIndices[edges[idx + 2]][0]
+            v21 = EdgeVertexIndices[edges[idx + 2]][1]
+
+            v0 = interpolate(pos + length * VertexPosition[v00], pos + length * VertexPosition[v01])
+            v1 = interpolate(pos + length * VertexPosition[v10], pos + length * VertexPosition[v11])
+            v2 = interpolate(pos + length * VertexPosition[v20], pos + length * VertexPosition[v21])
+
+            triangles.append(v0)
+            triangles.append(v1)
+            triangles.append(v2)
+
+    def march():
+        for i in range(divisions[2]):
+            zDisp = length * np.array([0, 0, i])
+
+            for j in range(divisions[1]):
+                yDisp = length * np.array([0, j, 0])
+
+                for k in range(divisions[0]):
+                    xDisp = length * np.array([k, 0, 0])
+
+                    currCorner = minVals + xDisp + yDisp + zDisp
+                    currCube = Voxel(currCorner, length)
+                    cubeIndex = calcCubeIndex(currCube)
+
+                    edges = TriangleTable[cubeIndex]
+                    parseEdges(edges, currCorner)
+
+    sdf = surface.getSDF()
+    bb = surface.boundingBox
+    bb = Cube([bb.min_x - length / 3, bb.max_x,
+               bb.min_y - length / 3, bb.max_y,
+               bb.min_z - length / 3, bb.max_z])
+
+    minVals = np.array([bb.min_x, bb.min_y, bb.min_z])
+    maxVals = np.array([bb.max_x, bb.max_y, bb.max_z])
+    diff = maxVals - minVals
+
+    divisions = np.ceil(diff / np.repeat(length, 3))
+    divisions = divisions.astype(np.int64)
+    triangles = []
+    march()
+    m = gl.GLMeshItem()
+    m.setMeshData(**plot_mesh(np.array(triangles), color="#6ecd00"))
+
+    return m
+
+
+class Voxel():
+    def __init__(self, corner, length):
+        x = length * np.array([1, 0, 0])
+        y = length * np.array([0, 1, 0])
+        z = length * np.array([0, 0, 1])
+        self.vertices = [
+            corner,
+            corner + x,
+            corner + y,
+            corner + x + y,
+            corner + z,
+            corner + x + z,
+            corner + y + z,
+            corner + x + y + z
+        ]
+
+
+
+
+
+
+
+
 
 
 
