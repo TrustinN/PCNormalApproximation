@@ -1,11 +1,11 @@
 import timeit
 
 import numpy as np
+
 from samples.ball import Ball
 from samples.ballAndBox import ballAndBox
 from samples.box import Box
 from samples.plane import Plane
-
 from utils import PCtoSurface, visualizeProp
 
 
@@ -44,6 +44,11 @@ class PCSolver:
         self.profile["Riemanian Graph"] = end - start
 
         start = timeit.default_timer()
+        s.computeEMST()
+        end = timeit.default_timer()
+        self.profile["EMST"] = end - start
+
+        start = timeit.default_timer()
         s.computeTraversalMST()
         end = timeit.default_timer()
         self.profile["Traversal MST"] = end - start
@@ -52,15 +57,24 @@ class PCSolver:
         s.computeMesh()
         end = timeit.default_timer()
         self.profile["Marching Cubes"] = end - start
+        keys = [
+            "prop",
+            "point cloud",
+            "tangent centers",
+            "normals",
+            "riemanian graph",
+            "emst",
+            "traversal order",
+            "mesh",
+        ]
+        plotItems = {key: None for key in keys}
+        plotItems["prop"] = visualizeProp(prop)
+        plotItems["point cloud"] = s.visualizePoints()
+        plotItems["tangent centers"] = s.visualizeTPCenters()
+        plotItems["normals"] = s.visualizeTPNormals()
+        plotItems["riemanian graph"] = s.visualizeRiemanianGraph()
+        plotItems["emst"] = s.visualizeEMST()
+        plotItems["traversal order"] = s.visualizeTraversalMST()
+        plotItems["mesh"] = s.visualizeSurface()
 
-        plotItems = {
-            "prop": visualizeProp(prop),
-            "point cloud": s.visualizePoints(),
-            "tangent centers": s.visualizeTPCenters(),
-            "normals": s.visualizeTPNormals(),
-            "riemanian graph": s.visualizeRiemanianGraph(),
-            "emst": None,
-            "traversal order": s.visualizeTraversalMST(),
-            "mesh": s.visualizeSurface(),
-        }
         return plotItems

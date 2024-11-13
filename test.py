@@ -1,8 +1,5 @@
-import pyqtgraph as pg
-import pyqtgraph.opengl as gl
+import numpy as np
 
-pg.mkQApp("pcNormals")
-view = gl.GLViewWidget()
-g = gl.GLGridItem()
-print(view.cameraParams())
-view.setCameraPosition(view.cameraParams())
+arry = np.array([1, 2, 3])
+print(np.repeat(arry, 2))
+print("done")

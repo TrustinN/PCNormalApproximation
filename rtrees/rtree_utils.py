@@ -339,13 +339,13 @@ class Rect(Bound):
 
 class Cube(Bound):
 
-    def __init__(self, bound=[]):
+    def __init__(self, bound=None):
 
         super().__init__(3)
         self.bound = bound
         self.hull = None
 
-        if bound:
+        if bound is not None:
 
             self.min_x = bound[0]
             self.max_x = bound[1]
@@ -591,23 +591,16 @@ class IndexRecord(Entry):
 
     def __init__(self, bound, tuple_identifier):
 
-        self.dim = len(tuple_identifier)
-
-        if not bound:
-            if self.dim == 2:
-                bound = Rect([tuple_identifier[i // 2] for i in range(2 * self.dim)])
-
-            elif self.dim == 3:
-                bound = Cube([tuple_identifier[i // 2] for i in range(2 * self.dim)])
+        self.dim = len(bound.bound) // 2
 
         super().__init__(bound)
         self.tuple_identifier = tuple_identifier
 
-    # def __eq__(self, other):
-    #     return self.tuple_identifier == other.tuple_identifier
-    #
-    # def __neq__(self, other):
-    #     return not self.__eq__(other)
+    def __eq__(self, other):
+        return self.tuple_identifier == other.tuple_identifier
+
+    def __neq__(self, other):
+        return not self.__eq__(other)
 
     def __str__(self):
         return f"val: {self.tuple_identifier}"

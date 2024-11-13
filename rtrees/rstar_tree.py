@@ -1,14 +1,15 @@
 import math
 import random
-import numpy as np
 import textwrap
-from queue import PriorityQueue
-from .rtree_utils import IndexRecord
-from .rtree_utils import IndexPointer
 from dataclasses import dataclass, field
+from queue import PriorityQueue
 from typing import Any
-from .plot import plot_mesh, plot_polygons, plot_points
+
+import numpy as np
 from colorutils import Color
+
+from .plot import plot_mesh, plot_points, plot_polygons
+from .rtree_utils import IndexPointer, IndexRecord
 
 
 @dataclass(order=True)
@@ -34,8 +35,7 @@ class Node:
 
 class RTree(object):
 
-    from .rtree_utils import Rect
-    from .rtree_utils import Cube
+    from .rtree_utils import Cube, Rect
 
     class BranchNode(Node):
 
@@ -64,20 +64,34 @@ class RTree(object):
             string = ""
             for i in self.items:
                 string += str(i) + "\n"
-            return "Branch " + f"{self.level} " + "(\n" + textwrap.indent(string, "    ") + ")"
+            return (
+                "Branch "
+                + f"{self.level} "
+                + "(\n"
+                + textwrap.indent(string, "    ")
+                + ")"
+            )
 
         def __repr__(self):
             string = ""
             for i in self.items:
                 string += str(i) + "\n"
-            return "Branch " + f"{self.level} " + "(\n" + textwrap.indent(string, "    ") + ")"
+            return (
+                "Branch "
+                + f"{self.level} "
+                + "(\n"
+                + textwrap.indent(string, "    ")
+                + ")"
+            )
 
     class LeafNode(Node):
 
         def __init__(self, items, covering, level=0):
 
             super().__init__(items, covering, level)
-            self.color = "#" + "".join([random.choice('ABCDEF0123456789') for i in range(6)])
+            self.color = "#" + "".join(
+                [random.choice("ABCDEF0123456789") for i in range(6)]
+            )
 
         def plot(self, lp, bp, pp, colors):
 
@@ -108,7 +122,9 @@ class RTree(object):
                 if entry.__eq__(self.items[i]):
 
                     self.items.remove(entry)
-                    self.update_bound(RTree.Bound.combine([j.bound for j in self.items]))
+                    self.update_bound(
+                        RTree.Bound.combine([j.bound for j in self.items])
+                    )
                     return True
 
             return False
@@ -120,13 +136,25 @@ class RTree(object):
             string = ""
             for i in self.items:
                 string += str(i) + "\n"
-            return "Leaf " + f"{self.level} (" + "\n" + textwrap.indent(string, "    ") + ")"
+            return (
+                "Leaf "
+                + f"{self.level} ("
+                + "\n"
+                + textwrap.indent(string, "    ")
+                + ")"
+            )
 
         def __repr__(self):
             string = ""
             for i in self.items:
                 string += str(i) + "\n"
-            return "Leaf " + f"{self.level} (" + "\n" + textwrap.indent(string, "    ") + ")"
+            return (
+                "Leaf "
+                + f"{self.level} ("
+                + "\n"
+                + textwrap.indent(string, "    ")
+                + ")"
+            )
 
     ###########################################################################
     # Methods                                                                 #
@@ -135,10 +163,10 @@ class RTree(object):
     def __init__(self, M, dim):
 
         self.max_num = M
-        self.min_num = max(math.floor(M * .4), 1)
+        self.min_num = max(math.floor(M * 0.4), 1)
 
         self.height = 0
-        self.p = max(min(math.floor(M * .3), 32), 1)
+        self.p = max(min(math.floor(M * 0.3), 32), 1)
         self.dim = dim
 
         if self.dim == 2:
@@ -210,8 +238,10 @@ class RTree(object):
         if curr_lvl == 0:
 
             # sort by least area needed to expand and take first p entries
-            node.items = sorted(node.items, key=lambda x: RTree.FindAddedArea(x, index_entry)[1])
-            items = node.items[:self.p]
+            node.items = sorted(
+                node.items, key=lambda x: RTree.FindAddedArea(x, index_entry)[1]
+            )
+            items = node.items[: self.p]
 
         else:
             items = node.items
@@ -221,7 +251,9 @@ class RTree(object):
             curr_ptr = items[i]
 
             if curr_lvl == 0:
-                curr_vol, diff = RTree.FindAddedOverlap(curr_ptr, node.items, index_entry)
+                curr_vol, diff = RTree.FindAddedOverlap(
+                    curr_ptr, node.items, index_entry
+                )
 
             else:
                 curr_vol, diff = RTree.FindAddedArea(curr_ptr, index_entry)
@@ -252,7 +284,9 @@ class RTree(object):
         def helper_func(items, start, idx):
 
             sb1 = [items[j].bound for j in range(start + idx)]
-            sb2 = [items[j + start + idx].bound for j in range(len(items) - start - idx)]
+            sb2 = [
+                items[j + start + idx].bound for j in range(len(items) - start - idx)
+            ]
             mb1 = RTree.Bound.combine(sb1)
             mb2 = RTree.Bound.combine(sb2)
             margin_1, margin_2 = mb1.margin(), mb2.margin()
@@ -333,7 +367,10 @@ class RTree(object):
 
             # find index to split along by least overlap
             s1 = [items[j].bound for j in range(self.min_num + i)]
-            s2 = [items[j + self.min_num + i].bound for j in range(len(items) - self.min_num - i)]
+            s2 = [
+                items[j + self.min_num + i].bound
+                for j in range(len(items) - self.min_num - i)
+            ]
 
             tmp_b1 = RTree.Bound.combine(s1)
             tmp_b2 = RTree.Bound.combine(s2)
@@ -391,11 +428,15 @@ class RTree(object):
 
     def Reinsert(self, node):
 
-        sort_dist = sorted(node.items, key=lambda x: np.linalg.norm(node.covering.center - x.bound.center), reverse=True)
-        node.items = sort_dist[self.p:]
+        sort_dist = sorted(
+            node.items,
+            key=lambda x: np.linalg.norm(node.covering.center - x.bound.center),
+            reverse=True,
+        )
+        node.items = sort_dist[self.p :]
         node.update_bound(RTree.Bound.combine([n.bound for n in node.items]))
 
-        return sort_dist[:self.p][::-1]
+        return sort_dist[: self.p][::-1]
 
     def ChooseLeaf(self, node, index_entry, curr_lvl, overflowed, ins_lvl=0):
 
@@ -408,10 +449,11 @@ class RTree(object):
                 if curr_lvl == 0:
 
                     # if node is too big, split leaf node
-                    n1, n2, r, r_lvl = self.OverflowTreatment(node,
-                                                              curr_lvl,
-                                                              overflowed,
-                                                              )
+                    n1, n2, r, r_lvl = self.OverflowTreatment(
+                        node,
+                        curr_lvl,
+                        overflowed,
+                    )
 
                     if r:
                         for elem in r:
@@ -420,18 +462,20 @@ class RTree(object):
         else:
 
             # choosing parent of entry to insert
-            idx_ptr, ptr_pos = self.ChooseSubTree(node,
-                                                  index_entry,
-                                                  curr_lvl,
-                                                  )
+            idx_ptr, ptr_pos = self.ChooseSubTree(
+                node,
+                index_entry,
+                curr_lvl,
+            )
 
             # index.pointer is the pointer to one of node's children nodes
-            n1, n2, q, r_lvl = self.ChooseLeaf(node=idx_ptr.pointer,
-                                               index_entry=index_entry,
-                                               curr_lvl=curr_lvl - 1,
-                                               ins_lvl=ins_lvl,
-                                               overflowed=overflowed,
-                                               )
+            n1, n2, q, r_lvl = self.ChooseLeaf(
+                node=idx_ptr.pointer,
+                index_entry=index_entry,
+                curr_lvl=curr_lvl - 1,
+                ins_lvl=ins_lvl,
+                overflowed=overflowed,
+            )
 
             # update bound
             idx_ptr.update(idx_ptr.pointer.covering)
@@ -449,10 +493,11 @@ class RTree(object):
             if len(node.items) > self.max_num:
 
                 # If the branch node has too many items split
-                n1, n2, r, r_lvl = self.OverflowTreatment(node,
-                                                          curr_lvl,
-                                                          overflowed,
-                                                          )
+                n1, n2, r, r_lvl = self.OverflowTreatment(
+                    node,
+                    curr_lvl,
+                    overflowed,
+                )
 
                 if r:
                     for elem in r:
@@ -466,12 +511,13 @@ class RTree(object):
     # if root node is too big, we split
     def Insert(self, entry, ins_lvl=0, overflowed=set()):
 
-        n1, n2, q, r_lvl = self.ChooseLeaf(node=self.root,
-                                           index_entry=entry,
-                                           curr_lvl=self.height,
-                                           ins_lvl=ins_lvl,
-                                           overflowed=overflowed,
-                                           )
+        n1, n2, q, r_lvl = self.ChooseLeaf(
+            node=self.root,
+            index_entry=entry,
+            curr_lvl=self.height,
+            ins_lvl=ins_lvl,
+            overflowed=overflowed,
+        )
 
         if n2:
 
@@ -480,10 +526,11 @@ class RTree(object):
             new_bound = RTree.Bound.combine([p1.bound, p2.bound])
 
             self.height += 1
-            self.root = RTree.BranchNode(items=[],
-                                         covering=new_bound,
-                                         level=self.height,
-                                         )
+            self.root = RTree.BranchNode(
+                items=[],
+                covering=new_bound,
+                level=self.height,
+            )
             self.root.add_entry(p1)
             self.root.add_entry(p2)
 
@@ -516,7 +563,13 @@ class RTree(object):
                         child_node = curr_item.pointer
 
                         # If we found an entry and deleted it, do whats after
-                        if FindLeaf(child_node, index_entry, curr_lvl=curr_lvl - 1, ins_lvls=ins_lvls, to_insert=to_insert):
+                        if FindLeaf(
+                            child_node,
+                            index_entry,
+                            curr_lvl=curr_lvl - 1,
+                            ins_lvls=ins_lvls,
+                            to_insert=to_insert,
+                        ):
                             rm_item = True
 
                             # delete underfull nodes
@@ -538,7 +591,9 @@ class RTree(object):
 
                     # points to branch, update bound if childpointer was changed
                     if rm_item:
-                        node.update_bound(RTree.Bound.combine([n.bound for n in node.items]))
+                        node.update_bound(
+                            RTree.Bound.combine([n.bound for n in node.items])
+                        )
 
                         return True
 
@@ -548,7 +603,13 @@ class RTree(object):
         insert_lvls, to_insert = [], []
 
         # call recursive function
-        FindLeaf(self.root, index_entry=entry, curr_lvl=self.height, ins_lvls=insert_lvls, to_insert=to_insert)
+        FindLeaf(
+            self.root,
+            index_entry=entry,
+            curr_lvl=self.height,
+            ins_lvls=insert_lvls,
+            to_insert=to_insert,
+        )
 
         # reinsert here
         for lvl, node in zip(insert_lvls, to_insert):
@@ -630,7 +691,7 @@ class RTree(object):
             elem = pq.get().item
 
             if isinstance(elem, IndexRecord):
-                neighbors.append(elem)
+                neighbors.append(elem.tuple_identifier)
 
                 if len(neighbors) == k:
                     return neighbors
@@ -638,7 +699,7 @@ class RTree(object):
             elif type(elem) is RTree.LeafNode:
                 for r in elem.items:
 
-                    dist_r = np.linalg.norm(r.tuple_identifier - entry.tuple_identifier)
+                    dist_r = np.linalg.norm(r.bound.bound[::2] - entry.bound.bound[::2])
                     e = PrioritizedItem(dist_r, r)
                     pq.put(e)
 
@@ -646,23 +707,10 @@ class RTree(object):
                 for b in elem.items:
 
                     child_node = b.pointer
-                    dist = RTree.Bound.get_dist(child_node.covering, entry.tuple_identifier)
+                    dist = RTree.Bound.get_dist(
+                        child_node.covering, entry.bound.bound[::2]
+                    )
                     e = PrioritizedItem(dist, child_node)
                     pq.put(e)
 
         return neighbors
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

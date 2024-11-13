@@ -86,9 +86,13 @@ def tangentPlanes(pc, tree, numNeighbors=15):
     """
 
     tP = []
-    for p in pc:
-        nn = tree.NearestNeighbor(entry=TargetVertex(value=p), k=numNeighbors)
-        nn = [r.tuple_identifier for r in nn]
+    for i in range(len(pc)):
+        ir = IndexRecord(bound=Cube(np.repeat(pc[i], 2)), tuple_identifier=i)
+        nn = tree.NearestNeighbor(
+            ir,
+            k=numNeighbors,
+        )
+        nn = [pc[idx] for idx in nn]
         tP.append(getTangentPlane(nn))
 
     return tP
@@ -162,18 +166,24 @@ class PrioritizedItem:
     item: Any = field(compare=False)
 
 
-class Graph:
-    def __init__(self, vertices):
-        self.vertices = vertices
+class GraphUtils:
+    def joinGraphs(adjList1, adjList2):
+        assert len(adjList1) == len(adjList2)
 
-    def visualizeEdges(self):
+        newAdjList = []
+        for i in range(len(adjList1)):
+            newAdjList.append(adjList1[i] | adjList2[i])
+
+        return newAdjList
+
+    def visualizeEdges(vertices, adjList):
         lines = []
-        for v in self.vertices:
-            for n in v.neighbors:
-                v1 = v.tuple_identifier
+        for vIdx in range(len(vertices)):
+            v1 = vertices[vIdx]
+            for nIdx in adjList[vIdx]:
                 lines.append(v1)
 
-                v2 = n.tuple_identifier
+                v2 = vertices[nIdx]
                 lines.append(v2)
 
         lines = gl.GLLinePlotItem(pos=np.array(lines), mode="lines", color=(1, 0, 0, 1))
@@ -182,47 +192,20 @@ class Graph:
 
 
 class EMST:
+    def __init__(self, nodes, tree):
 
-    class Node(TargetVertex):
-        def __init__(self, value, item, id):
-            super().__init__(value)
-            self.neighbors = []
-            self.item = item
-            self.id = id
-
-        def __eq__(self, other):
-            return super().__eq__(other) and self.id == other.id
-
-        def __neq__(self, other):
-            return not self.__eq__(other)
-
-        def compareValues(f):
-            def c(n1, n2):
-                return f(n1.tuple_identifier, n2.tuple_identifier)
-
-            return c
-
-        def compareItems(f):
-            def c(n1, n2):
-                return f(n1.item, n2.item)
-
-            return c
-
-        def edgeTo(self, other):
-            self.neighbors.append(other)
-
-    def __init__(self, graph, tree):
-
-        self.vertices = graph.vertices
+        self.vertices = nodes
+        self.adjList = [set() for i in range(len(self.vertices))]
         visited = np.zeros(len(self.vertices))
         visited[0] = 1
 
         seed = self.vertices[0]
-        tree.Delete(seed)
-        nn = tree.NearestNeighbor(seed)[0]
+        seedIR = IndexRecord(bound=Cube(np.repeat(seed, 2)), tuple_identifier=0)
+        tree.Delete(seedIR)
+        nn = tree.NearestNeighbor(seedIR)[0]
 
         pq = PriorityQueue()
-        pq.put(PrioritizedItem(-math.inf, (seed, nn)))
+        pq.put(PrioritizedItem(-math.inf, (0, nn)))
         edges = 0
 
         while True:
@@ -230,121 +213,100 @@ class EMST:
             # p2 is vertex to be added
 
             v1, v2 = pq.get().item
-            if not visited[v2.id]:
-                v1.edgeTo(v2)
-                v2.edgeTo(v1)
+            v1Vertex = self.vertices[v1]
+            v2Vertex = self.vertices[v2]
+            v1IR = IndexRecord(bound=Cube(np.repeat(v1Vertex, 2)), tuple_identifier=v1)
+            v2IR = IndexRecord(bound=Cube(np.repeat(v2Vertex, 2)), tuple_identifier=v2)
+            if not visited[v2]:
+                self.adjList[v1].add(v2)
+                self.adjList[v2].add(v1)
                 edges += 1
-                visited[v2.id] = 1
-                tree.Delete(v2)
+                visited[v2] = 1
+                tree.Delete(v2IR)
 
                 if edges == len(self.vertices) - 1:
                     break
 
-                v1NN = tree.NearestNeighbor(v1)[0]
-                v2NN = tree.NearestNeighbor(v2)[0]
-                v1Dist = np.linalg.norm(v1.tuple_identifier - v1NN.tuple_identifier)
-                v2Dist = np.linalg.norm(v2.tuple_identifier - v2NN.tuple_identifier)
+                v1NN = tree.NearestNeighbor(v1IR)[0]
+                v2NN = tree.NearestNeighbor(v2IR)[0]
+                v1Dist = np.linalg.norm(v1Vertex - self.vertices[v1NN])
+                v2Dist = np.linalg.norm(v2Vertex - self.vertices[v2NN])
                 pq.put(PrioritizedItem(v1Dist, (v1, v1NN)))
                 pq.put(PrioritizedItem(v2Dist, (v2, v2NN)))
 
     def visualizeEdges(self):
-        lines = []
-        for v in self.vertices:
-            for n in v.neighbors:
-                v1 = v.tuple_identifier
-                lines.append(v1)
-
-                v2 = n.tuple_identifier
-                lines.append(v2)
-
-        lines = gl.GLLinePlotItem(pos=np.array(lines), mode="lines", color=(1, 0, 0, 1))
-        lines.setGLOptions("translucent")
-        return lines
+        return GraphUtils.visualizeEdges(self.vertices, self.adjList)
 
 
-class RiemanianGraph(EMST):
+class RiemanianGraph:
 
     def __init__(self, nodes, tree, k=15):
         self.vertices = nodes
         self.longestEdge = -math.inf
+        self.adjList = [set() for i in range(len(self.vertices))]
 
-        for v in self.vertices:
-            kNN = tree.NearestNeighbor(v, k=k)
+        for i in range(len(self.vertices)):
+            v = self.vertices[i]
+            kNN = tree.NearestNeighbor(
+                IndexRecord(bound=Cube(np.repeat(v, 2)), tuple_identifier=i), k=k
+            )
             self.longestEdge = max(
-                np.linalg.norm(kNN[1].tuple_identifier - v.tuple_identifier),
+                np.linalg.norm(self.vertices[kNN[1]] - v),
                 self.longestEdge,
             )
-            for i in range(1, len(kNN)):
-                p = kNN[i]
-                v.neighbors.append(p)
-                p.neighbors.append(v)
-
-        super().__init__(self, tree)
+            for j in range(1, len(kNN)):
+                p = kNN[j]
+                self.adjList[p].add(i)
+                self.adjList[i].add(p)
 
     def visualizeEdges(self):
-        lines = []
-        for v in self.vertices:
-            for n in v.neighbors:
-                v1 = v.tuple_identifier
-                lines.append(v1)
-
-                v2 = n.tuple_identifier
-                lines.append(v2)
-
-        lines = gl.GLLinePlotItem(pos=np.array(lines), mode="lines", color=(1, 0, 0, 1))
-        lines.setGLOptions("translucent")
-        return lines
-
-    def getMST(self, weight):
-        copy = []
-        adjList = [[] for i in range(len(self.vertices))]
-        visited = np.zeros(len(self.vertices))
-        visited[0] = 1
-        for v in self.vertices:
-            n = RiemanianGraph.Node(v.tuple_identifier, v.item, v.id)
-            copy.append(n)
-
-        edges = 0
-        pq = PriorityQueue()
-        seed = self.vertices[0]
-        for v in seed.neighbors:
-            pq.put(PrioritizedItem(weight(seed, v), (seed, v)))
-
-        while True:
-            # pq item of form (p1, p2) where p1 is in current MST
-            # p2 is vertex to be added
-
-            v1, v2 = pq.get().item
-            if not visited[v2.id]:
-                adjList[v1.id].append(v2.id)
-                adjList[v2.id].append(v1.id)
-                visited[v2.id] = 1
-                edges += 1
-
-                if edges == len(self.vertices) - 1:
-                    break
-
-                for v in v1.neighbors:
-                    if not visited[v.id]:
-                        pq.put(PrioritizedItem(weight(v1, v), (v1, v)))
-                for v in v2.neighbors:
-                    if not visited[v.id]:
-                        pq.put(PrioritizedItem(weight(v2, v), (v2, v)))
-
-        for v1 in range(len(adjList)):
-            row = adjList[v1]
-            for v2 in row:
-                copy[v1].neighbors.append(copy[v2])
-
-        return Graph(copy)
+        return GraphUtils.visualizeEdges(self.vertices, self.adjList)
 
 
-def fixOrientations(graph):
-    visited = np.zeros(len(graph.vertices))
-    start = max(graph.vertices, key=lambda v: v.tuple_identifier[2])
+def getMST(vertices, adjList, weight):
+    returnAdjList = [set() for i in range(len(vertices))]
+    visited = np.zeros(len(vertices))
+    visited[0] = 1
 
-    if np.dot(start.item.normal, np.array([0, 0, 1])) < 0:
-        start.item.normal = -start.item.normal
+    edges = 0
+    pq = PriorityQueue()
+    for v in adjList[0]:
+        pair = (vertices[0], vertices[v])
+        pq.put(PrioritizedItem(weight(*pair), (0, v)))
+
+    while True:
+        # pq item of form (p1, p2) where p1 is in current MST
+        # p2 is vertex to be added
+
+        v1, v2 = pq.get().item
+        if not visited[v2]:
+            returnAdjList[v1].add(v2)
+            returnAdjList[v2].add(v1)
+            visited[v2] = 1
+            edges += 1
+
+            if edges == len(vertices) - 1:
+                break
+
+            for v in adjList[v1]:
+                if not visited[v]:
+                    pq.put(PrioritizedItem(weight(vertices[v1], vertices[v]), (v1, v)))
+
+            for v in adjList[v2]:
+                if not visited[v]:
+                    pq.put(PrioritizedItem(weight(vertices[v2], vertices[v]), (v2, v)))
+
+    return returnAdjList
+
+
+def fixOrientations(tangentPlanes, adjList):
+    visited = np.zeros(len(adjList))
+    start = max(tangentPlanes, key=lambda v: v.center[2])
+    startIdx = tangentPlanes.index(start)
+    visited[startIdx] = 1
+
+    if np.dot(start.normal, np.array([0, 0, 1])) < 0:
+        start.normal = -start.normal
 
     # makes tangentPlane2 have the same normal vec
     # orientation as tangentPlane1
@@ -352,34 +314,40 @@ def fixOrientations(graph):
         if np.dot(tp1.normal, tp2.normal) < 0:
             tp2.normal = -tp2.normal
 
-    def DFS(v):
-        visited[v.id] = 1
-        for n in v.neighbors:
-            if not visited[n.id]:
-                align(v.item, n.item)
-                DFS(n)
+    def DFS_iterative(startIdx):
+        stack = [startIdx]
+        while stack:
+            v = stack.pop()
+            for n in adjList[v]:
+                if not visited[n]:
+                    visited[n] = 1
+                    align(tangentPlanes[v], tangentPlanes[n])
+                    stack.append(n)
 
-    DFS(start)
+    DFS_iterative(startIdx)
 
 
 def getSDF(pc, tp, delta, ro):
 
     # pcTree = RTree(M=10, dim=3)
-    tpTree = RTree(M=10, dim=3)
     #
     # for p in pc:
     #     pcTree.Insert(IndexRecord(bound=None, tuple_identifier=p))
     #
-    for p in tp:
-        tpTree.Insert(p)
+    tpTree = RTree(M=10, dim=3)
+
+    for i in range(len(tp)):
+        bound = Cube(np.repeat(tp[i].center, 2))
+        tpTree.Insert(IndexRecord(bound=bound, tuple_identifier=i))
 
     def dist(point, tp):
         return np.dot(point - tp.center, tp.normal)
 
     def sdf(x):
-        tpNear = tpTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=x))[
-            0
-        ].item
+        idx = tpTree.NearestNeighbor(
+            IndexRecord(bound=Cube(np.repeat(x, 2)), tuple_identifier=0)
+        )[0]
+        tpNear = tp[idx]
         projNorm = dist(x, tpNear)
         # projX = x - projNorm * tpNear.normal
         #
@@ -414,39 +382,37 @@ class PCtoSurface:
         self.pc = pc
 
         self.pcTree = RTree(M=10, dim=3)
-        for p in pc:
-            self.pcTree.Insert(TargetVertex(value=p))
+        for i in range(len(self.pc)):
+            self.pcTree.Insert(
+                IndexRecord(bound=Cube(np.repeat(self.pc[i], 2)), tuple_identifier=i)
+            )
 
     def computeTPs(self, k=15):
         self.tP = tangentPlanes(pc=self.pc, tree=self.pcTree, numNeighbors=k)
-        self.tPNodes = [
-            EMST.Node(self.tP[i].center, self.tP[i], i) for i in range(len(self.tP))
-        ]
         self.centers = [p.center for p in self.tP]
-
-        self.tpTree = RTree(M=10, dim=3)
-        for tp in self.tPNodes:
-            self.tpTree.Insert(tp)
-
-    def computeRiemanianGraph(self, k=15):
-        self.rG = RiemanianGraph(self.tPNodes, self.tpTree, k=k)
-
-    def computeTraversalMST(self):
-        self.mst = self.rG.getMST(RiemanianGraph.Node.compareItems(OrientedTP.offset))
-
-    def computeMesh(self):
-        fixOrientations(self.mst)
         self.normals = [p.normal for p in self.tP]
 
         self.tpTree = RTree(M=10, dim=3)
-        for tp in self.tPNodes:
-            self.tpTree.Insert(tp)
+        for i in range(len(self.centers)):
+            bound = Cube(np.repeat(self.centers[i], 2))
+            self.tpTree.Insert(IndexRecord(bound=bound, tuple_identifier=i))
 
         self.boundingBox = self.tpTree.root.covering
-        self.sdf = getSDF(
-            pc=self.pc, tp=self.tPNodes, delta=0, ro=self.rG.longestEdge / 2
-        )
 
+    def computeRiemanianGraph(self, k=15):
+        self.rG = RiemanianGraph(self.centers, self.tpTree, k=k)
+
+    def computeEMST(self):
+        self.emst = EMST(self.centers, self.tpTree)
+
+    def computeTraversalMST(self):
+        self.rGEMSTjoin = GraphUtils.joinGraphs(self.rG.adjList, self.emst.adjList)
+        self.mst = getMST(self.tP, self.rGEMSTjoin, OrientedTP.offset)
+
+    def computeMesh(self):
+        fixOrientations(self.tP, self.mst)
+        self.normals = [p.normal for p in self.tP]
+        self.sdf = getSDF(pc=self.pc, tp=self.tP, delta=0, ro=self.rG.longestEdge / 2)
         self.mesh = MarchingCubes(self, 1.2 * self.rG.longestEdge)
 
     def getPoints(self):
@@ -479,8 +445,11 @@ class PCtoSurface:
     def visualizeRiemanianGraph(self):
         return self.rG.visualizeEdges()
 
+    def visualizeEMST(self):
+        return self.emst.visualizeEdges()
+
     def visualizeTraversalMST(self):
-        return self.mst.visualizeEdges()
+        return GraphUtils.visualizeEdges(self.centers, self.mst)
 
     def visualizeSurface(self):
         return self.mesh

@@ -5,7 +5,13 @@ from .core import Core
 from .display import Display
 from .main_window import MainWindow
 
-LABELS = ["Tangent Plane Calc", "Riemanian Graph", "Traversal MST", "Marching Cubes"]
+LABELS = [
+    "Tangent Plane Calc",
+    "Riemanian Graph",
+    "EMST",
+    "Traversal MST",
+    "Marching Cubes",
+]
 
 
 class PCApp(QApplication):
