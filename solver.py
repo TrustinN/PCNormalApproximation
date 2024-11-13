@@ -1,11 +1,11 @@
 import timeit
 
 import numpy as np
-
 from samples.ball import Ball
 from samples.ballAndBox import ballAndBox
 from samples.box import Box
 from samples.plane import Plane
+
 from utils import PCtoSurface, visualizeProp
 
 
@@ -19,7 +19,7 @@ class PCSolver:
         self.props = {
             "plane": Plane(radius=3, center=np.array([0, 0, 0])),
             "ball": Ball(center=np.array([0, 0, 0]), radius=3),
-            "box": Box(center=np.array([0, 0, 0]), x=2, y=3, z=4),
+            "box": Box(center=np.array([0, 0, 0]), x=2, y=3, z=2),
             "ballAndBox": ballAndBox(center=np.array([0, 0, 0]), radius=3),
         }
 
