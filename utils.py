@@ -98,16 +98,6 @@ def tangentPlanes(pc, tree, numNeighbors=15):
     return tP
 
 
-def makeView():
-    view = gl.GLViewWidget()
-
-    g = gl.GLGridItem()
-    view.addItem(g)
-    view.show()
-
-    return view
-
-
 def plotPoints(points, color):
     c = np.array([Color(web=color).rgb])
     cm = np.repeat(c, len(points), axis=0)
@@ -147,17 +137,6 @@ def visualizePC(pc, color="#464141"):
 def visualizeNormals(pc, normals):
     normalsPlot = plotNormals(points=pc, normals=normals)
     return normalsPlot
-
-
-class TargetVertex(IndexRecord):
-    def __init__(self, value):
-        super().__init__(bound=None, tuple_identifier=value)
-
-    def __eq__(self, other):
-        return np.array_equal(self.tuple_identifier, other.tuple_identifier)
-
-    def __neq__(self, other):
-        return not self.__eq__(other)
 
 
 @dataclass(order=True)
