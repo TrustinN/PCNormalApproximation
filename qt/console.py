@@ -65,7 +65,7 @@ class Options:
                 limits=["plane", "ball", "box", "ballAndBox"],
                 value="ball",
                 children=[
-                    dict(name="num_sample", type="float", value=1000),
+                    dict(name="samples", type="int", value=1000),
                 ],
             ),
             dict(

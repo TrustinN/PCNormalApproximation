@@ -26,11 +26,11 @@ class PCSolver:
     def setProp(self, name):
         self.prop = self.props[name]
 
-    def solve(self):
+    def solve(self, samples):
 
         k = 15
         prop = self.prop
-        pc = prop.sample(2000)
+        pc = prop.sample(samples)
         s = PCtoSurface(pc=pc)
 
         start = timeit.default_timer()

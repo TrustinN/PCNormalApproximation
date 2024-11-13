@@ -26,13 +26,20 @@ class Core:
 
         self.solver.setProp(self.params.child("Props").value())
 
-        plotItems = self.solver.solve()
+        plotItems = self.solver.solve(
+            self.params.child("Props").child("samples").value()
+        )
         self.display.loadItems(plotItems)
         self.params.child("display").child("mesh").setValue(True)
         self.params.child("display").child("tangent centers").setValue(True)
 
         profile = self.solver.profile
         self.console.updateData(profile)
+        self.update_pt()
+
+    def update_pt(self):
+        for key in self.toggle_functions:
+            self.toggle_functions[key]()
 
     def toggle_factory(self, name):
         def toggle_func():

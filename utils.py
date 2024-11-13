@@ -128,8 +128,11 @@ def plotNormals(points, normals):
 
 
 def visualizeProp(prop):
-    propPlot = prop.plotSurface()
-    return propPlot
+    try:
+        propPlot = prop.plotSurface()
+        return propPlot
+    except AttributeError:
+        return None
 
 
 def visualizePC(pc, color="#464141"):
@@ -265,27 +268,18 @@ class RiemanianGraph(EMST):
         self.vertices = nodes
         self.longestEdge = -math.inf
 
-        start = timeit.default_timer()
         for v in self.vertices:
             kNN = tree.NearestNeighbor(v, k=k)
-            closest = False
-            for i in range(len(kNN)):
+            self.longestEdge = max(
+                np.linalg.norm(kNN[1].tuple_identifier - v.tuple_identifier),
+                self.longestEdge,
+            )
+            for i in range(1, len(kNN)):
                 p = kNN[i]
-                if p != v:
-                    if not closest:
-                        closest = True
-                        dist = np.linalg.norm(p.tuple_identifier - v.tuple_identifier)
-                        if dist > self.longestEdge:
-                            self.longestEdge = dist
-                    v.neighbors.append(p)
-                    p.neighbors.append(v)
-        end = timeit.default_timer()
-        print("Riemanian Graph took", end - start, "seconds")
+                v.neighbors.append(p)
+                p.neighbors.append(v)
 
-        start = timeit.default_timer()
         super().__init__(self, tree)
-        end = timeit.default_timer()
-        print("EMST took", end - start, "seconds")
 
     def visualizeEdges(self):
         lines = []
@@ -370,12 +364,12 @@ def fixOrientations(graph):
 
 def getSDF(pc, tp, delta, ro):
 
-    pcTree = RTree(M=10, dim=3)
+    # pcTree = RTree(M=10, dim=3)
     tpTree = RTree(M=10, dim=3)
-
-    for p in pc:
-        pcTree.Insert(IndexRecord(bound=None, tuple_identifier=p))
-
+    #
+    # for p in pc:
+    #     pcTree.Insert(IndexRecord(bound=None, tuple_identifier=p))
+    #
     for p in tp:
         tpTree.Insert(p)
 
@@ -387,11 +381,11 @@ def getSDF(pc, tp, delta, ro):
             0
         ].item
         projNorm = dist(x, tpNear)
-        projX = x - projNorm * tpNear.normal
-
-        zNN = pcTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=projX))[
-            0
-        ].tuple_identifier
+        # projX = x - projNorm * tpNear.normal
+        #
+        # zNN = pcTree.NearestNeighbor(IndexRecord(bound=None, tuple_identifier=projX))[
+        #     0
+        # ].tuple_identifier
         # if np.linalg.norm(projX - zNN) < delta + ro:
         return projNorm
         #
@@ -438,10 +432,7 @@ class PCtoSurface:
         self.rG = RiemanianGraph(self.tPNodes, self.tpTree, k=k)
 
     def computeTraversalMST(self):
-        start = timeit.default_timer()
         self.mst = self.rG.getMST(RiemanianGraph.Node.compareItems(OrientedTP.offset))
-        end = timeit.default_timer()
-        print("MST took", end - start, "seconds")
 
     def computeMesh(self):
         fixOrientations(self.mst)
@@ -502,16 +493,16 @@ def MarchingCubes(surface, length):
             x + VertexPosition[:, 0], y + VertexPosition[:, 1], z + VertexPosition[:, 2]
         ]
         signs = sdfs >= 0
-        return signs.dot(2 ** np.arange(8))
+        return signs.dot(2 ** np.arange(8)), sdfs
 
-    def interpolate(v1, v2):
-        w1 = abs(sdf(v1))
-        w2 = abs(sdf(v2))
+    def interpolate(v1, v2, sdfV1, sdfV2):
+        w1 = abs(sdfV1)
+        w2 = abs(sdfV2)
         scale = w1 / (w1 + w2)
         v = scale * (v2 - v1) + v1
         return v
 
-    def parseEdges(edges, pos):
+    def parseEdges(edges, pos, sdfs):
         rep = (len(edges) - 1) // 3 + 1
         for i in range(rep):
             idx = 3 * i
@@ -523,13 +514,22 @@ def MarchingCubes(surface, length):
             v20, v21 = EdgeVertexIndices[edges[idx + 2]]
 
             v0 = interpolate(
-                pos + length * VertexPosition[v00], pos + length * VertexPosition[v01]
+                pos + length * VertexPosition[v00],
+                pos + length * VertexPosition[v01],
+                sdfs[v00],
+                sdfs[v01],
             )
             v1 = interpolate(
-                pos + length * VertexPosition[v10], pos + length * VertexPosition[v11]
+                pos + length * VertexPosition[v10],
+                pos + length * VertexPosition[v11],
+                sdfs[v10],
+                sdfs[v11],
             )
             v2 = interpolate(
-                pos + length * VertexPosition[v20], pos + length * VertexPosition[v21]
+                pos + length * VertexPosition[v20],
+                pos + length * VertexPosition[v21],
+                sdfs[v20],
+                sdfs[v21],
             )
 
             triangles.append(v0)
@@ -556,12 +556,11 @@ def MarchingCubes(surface, length):
                     currCorner = minVals + np.array(
                         [i * length, j * length, k * length]
                     )
-                    cubeIndex = calcCubeIndex(i, j, k, sdfGrid3D)
+                    cubeIndex, sdfs = calcCubeIndex(i, j, k, sdfGrid3D)
 
                     edges = TriangleTable[cubeIndex]
-                    parseEdges(edges, currCorner)
+                    parseEdges(edges, currCorner, sdfs)
 
-    sdf = surface.getSDF()
     bb = surface.boundingBox
     bb = Cube(
         [

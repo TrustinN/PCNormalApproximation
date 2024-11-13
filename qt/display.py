@@ -1,5 +1,7 @@
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
+from PyQt6.QtCore import QTimer
+from PyQt6.QtGui import QVector3D
 from pyqtgraph.Qt import QtWidgets
 
 
@@ -14,7 +16,11 @@ class Display(QtWidgets.QWidget):
         view.addItem(g)
         view.show()
         self.view = view
+        view.cameraPosition()
         self.layout.addWidget(self.view)
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.updateCamera)
+        self.timer.start(16)
 
         self.plotObjects = {
             "prop": None,
@@ -50,3 +56,8 @@ class Display(QtWidgets.QWidget):
     def show(self, name):
         if self.plotObjects[name]:
             return self.plotObjects[name].show()
+
+    def updateCamera(self):
+        params = self.view.cameraParams()
+        params["azimuth"] = (params["azimuth"] + 1) % 360
+        self.view.setCameraPosition(azimuth=params["azimuth"])
