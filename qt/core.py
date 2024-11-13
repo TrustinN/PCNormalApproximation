@@ -1,10 +1,4 @@
-import numpy as np
-
-from samples.ball import Ball
-from samples.ballAndBox import ballAndBox
-from samples.box import Box
-from samples.plane import Plane
-from utils import PCtoSurface, visualizeNormals, visualizePC, visualizeProp
+from solver import PCSolver
 
 
 class Core:
@@ -12,31 +6,11 @@ class Core:
         self.console = console
         self.display = display
         self.toggle_functions = {}
+        self.solver = PCSolver()
         for keys in display.plotObjects.keys():
             self.toggle_functions[keys] = self.toggle_factory(keys)
 
         self.connect_pt()
-
-        ## import project here, connect to display via plotObjects
-        k = 15
-        prop = Box(center=np.array([0, 0, 0]), x=1, y=1, z=1)
-        pc = prop.sample(1000)
-        s = PCtoSurface(pc=pc)
-        s.computeTPs(k)
-        s.computeRiemanianGraph(k)
-        s.computeTraversalMST()
-        s.computeMesh()
-        plotItems = {
-            "prop": visualizeProp(prop),
-            "point cloud": s.visualizePoints(),
-            "tangent centers": s.visualizeTPCenters(),
-            "normals": s.visualizeTPNormals(),
-            "riemanian graph": s.visualizeRiemanianGraph(),
-            "emst": None,
-            "traversal order": s.visualizeTraversalMST(),
-            "mesh": s.visualizeSurface(),
-        }
-        self.display.loadItems(plotItems)
 
     def connect_pt(self):
         self.params = self.console.options.params
@@ -44,6 +18,21 @@ class Core:
             self.params.child("display").child(key).sigTreeStateChanged.connect(
                 self.toggle_functions[key]
             )
+        self.params.child("run").sigTreeStateChanged.connect(self.update)
+
+    def update(self):
+        # clear previous plots
+        self.display.unloadItems()
+
+        self.solver.setProp(self.params.child("Props").value())
+
+        plotItems = self.solver.solve()
+        self.display.loadItems(plotItems)
+        self.params.child("display").child("mesh").setValue(True)
+        self.params.child("display").child("tangent centers").setValue(True)
+
+        profile = self.solver.profile
+        self.console.updateData(profile)
 
     def toggle_factory(self, name):
         def toggle_func():

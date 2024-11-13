@@ -35,6 +35,14 @@ class Display(QtWidgets.QWidget):
                 self.view.addItem(v)
                 v.hide()
 
+    def unloadItems(self):
+        for key in self.plotObjects:
+            if self.plotObjects[key]:
+                self.view.removeItem(self.plotObjects[key])
+                item = self.plotObjects[key]
+                self.plotObjects[key] = None
+                del item
+
     def hide(self, name):
         if self.plotObjects[name]:
             return self.plotObjects[name].hide()

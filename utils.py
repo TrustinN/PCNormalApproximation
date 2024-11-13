@@ -543,22 +543,20 @@ def MarchingCubes(surface, length):
             ),
             axis=-1,
         )
+        coords = np.moveaxis(coords, 0, 1)
         result = np.apply_along_axis(surface.getSDF(), axis=-1, arr=coords)
         return result
 
     def march():
 
-        for i in range(divisions[2]):
-            zDisp = length * np.array([0, 0, i])
-
+        for i in range(divisions[0]):
             for j in range(divisions[1]):
-                yDisp = length * np.array([0, j, 0])
+                for k in range(divisions[2]):
 
-                for k in range(divisions[0]):
-                    xDisp = length * np.array([k, 0, 0])
-
-                    currCorner = minVals + xDisp + yDisp + zDisp
-                    cubeIndex = calcCubeIndex(k, j, i, sdfGrid3D)
+                    currCorner = minVals + np.array(
+                        [i * length, j * length, k * length]
+                    )
+                    cubeIndex = calcCubeIndex(i, j, k, sdfGrid3D)
 
                     edges = TriangleTable[cubeIndex]
                     parseEdges(edges, currCorner)
@@ -578,19 +576,13 @@ def MarchingCubes(surface, length):
 
     minVals = np.array([bb.min_x, bb.min_y, bb.min_z])
     maxVals = np.array([bb.max_x, bb.max_y, bb.max_z])
-    start = timeit.default_timer()
-    sdfGrid3D = vectorizedSDFs(minVals, maxVals, length)
-    end = timeit.default_timer()
-    print("Grid took", end - start, "seconds")
     diff = maxVals - minVals
 
-    divisions = np.ceil(diff / np.repeat(length, 3))
+    divisions = np.ceil(diff / length)
     divisions = divisions.astype(np.int64)
+    sdfGrid3D = vectorizedSDFs(minVals, minVals + divisions * length, length)
     triangles = []
-    start = timeit.default_timer()
     march()
-    end = timeit.default_timer()
-    print("Marching Cubes took", end - start, "seconds")
     m = gl.GLMeshItem()
     m.setMeshData(**plot_mesh(np.array(triangles), color="#6ecd00"))
 
