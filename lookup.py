@@ -23,7 +23,6 @@
 # Triangulation cases are generated prioritising rotations over inversions, which can introduce non-manifold geometry.
 import numpy as np
 
-
 EdgeVertexIndices = [
     [0, 1],
     [1, 3],
@@ -39,16 +38,18 @@ EdgeVertexIndices = [
     [2, 6],
 ]
 
-VertexPosition = [
-    np.array([0, 0, 0]),
-    np.array([1, 0, 0]),
-    np.array([0, 1, 0]),
-    np.array([1, 1, 0]),
-    np.array([0, 0, 1]),
-    np.array([1, 0, 1]),
-    np.array([0, 1, 1]),
-    np.array([1, 1, 1]),
-]
+VertexPosition = np.array(
+    [
+        [0, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [1, 1, 0],
+        [0, 0, 1],
+        [1, 0, 1],
+        [0, 1, 1],
+        [1, 1, 1],
+    ]
+)
 
 TriangleTable = [
     [-1],
@@ -308,6 +309,3 @@ TriangleTable = [
     [8, 3, 0, -1],
     [-1],
 ]
-
-
-

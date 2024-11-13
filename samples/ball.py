@@ -17,7 +17,7 @@ class Ball():
             x = np.cos(theta) * a
             y = np.sin(theta) * a
 
-            p.append(np.array([x, y, z]))
+            p.append(np.array([x, y, z]) + self.center)
 
         return p
 

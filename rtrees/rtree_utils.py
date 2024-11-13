@@ -1,9 +1,10 @@
 import math
+
 import numpy as np
-from colorutils import Color
+import PyQt5
 import pyqtgraph as pg
 import pyqtgraph.opengl as gl
-import PyQt5
+from colorutils import Color
 
 
 class Bound:
@@ -37,7 +38,9 @@ class NCircle(Bound):
     def overlap(self, other):
 
         if type(other) is NCircle:
-            return np.linalg.norm(self.center - other.center) >= self.radius + other.radius
+            return (
+                np.linalg.norm(self.center - other.center) >= self.radius + other.radius
+            )
 
         elif type(other) is Rect:
             return Rect.get_dist(other, self.center) <= self.radius
@@ -48,10 +51,12 @@ class NCircle(Bound):
     def plot(self, color, view):
 
         if self.dim == 2:
-            circle = PyQt5.QtWidgets.QGraphicsEllipseItem(self.center[0] - self.radius,
-                                                          self.center[1] - self.radius,
-                                                          2 * self.radius,
-                                                          2 * self.radius)
+            circle = PyQt5.QtWidgets.QGraphicsEllipseItem(
+                self.center[0] - self.radius,
+                self.center[1] - self.radius,
+                2 * self.radius,
+                2 * self.radius,
+            )
 
             circle.setBrush(pg.mkBrush(color))
             view.addItem(circle)
@@ -63,9 +68,9 @@ class NCircle(Bound):
             p0, p1, p2 = rgb[0], rgb[1], rgb[2]
             colors = np.ones((md.faceCount(), 4), dtype=float)
             colors[:, 3] = 0.2
-            colors[:, 2] = np.linspace(p2/255, 1, colors.shape[0])
-            colors[:, 1] = np.linspace(p1/255, 1, colors.shape[0])
-            colors[:, 0] = np.linspace(p0/255, 1, colors.shape[0])
+            colors[:, 2] = np.linspace(p2 / 255, 1, colors.shape[0])
+            colors[:, 1] = np.linspace(p1 / 255, 1, colors.shape[0])
+            colors[:, 0] = np.linspace(p0 / 255, 1, colors.shape[0])
 
             md.setFaceColors(colors=colors)
             m1 = gl.GLMeshItem(
@@ -184,7 +189,12 @@ class Rect(Bound):
         return 2 * (self.length + self.width)
 
     def contains(self, other):
-        return (self.min_x <= other.min_x) and (self.max_x >= other.max_x) and (self.min_y <= other.min_y) and (self.max_y >= other.max_y)
+        return (
+            (self.min_x <= other.min_x)
+            and (self.max_x >= other.max_x)
+            and (self.min_y <= other.min_y)
+            and (self.max_y >= other.max_y)
+        )
 
     def contains_point(self, p):
 
@@ -262,8 +272,8 @@ class Rect(Bound):
     # returns overlap area of two bounds
     def overlap(self, other):
 
-        l_sum = .5 * (self.length + other.length)
-        w_sum = .5 * (self.width + other.width)
+        l_sum = 0.5 * (self.length + other.length)
+        w_sum = 0.5 * (self.width + other.width)
 
         x_dist = abs(self.center_x - other.center_x)
         y_dist = abs(self.center_y - other.center_y)
@@ -295,27 +305,30 @@ class Rect(Bound):
         if btw_y:
             return x_dist
 
-        return math.sqrt(x_dist ** 2 + y_dist ** 2)
+        return math.sqrt(x_dist**2 + y_dist**2)
 
     def get_facets(self):
 
-        return np.array([
-            [np.array([self.min_x, self.min_y]),
-             np.array([self.min_x, self.max_y])
-             ],
-
-            [np.array([self.min_x, self.max_y]),
-             np.array([self.max_x, self.max_y])
-             ],
-
-            [np.array([self.max_x, self.max_y]),
-             np.array([self.max_x, self.min_y])
-             ],
-
-            [np.array([self.max_x, self.min_y]),
-             np.array([self.min_x, self.min_y])
-             ],
-        ])
+        return np.array(
+            [
+                [
+                    np.array([self.min_x, self.min_y]),
+                    np.array([self.min_x, self.max_y]),
+                ],
+                [
+                    np.array([self.min_x, self.max_y]),
+                    np.array([self.max_x, self.max_y]),
+                ],
+                [
+                    np.array([self.max_x, self.max_y]),
+                    np.array([self.max_x, self.min_y]),
+                ],
+                [
+                    np.array([self.max_x, self.min_y]),
+                    np.array([self.min_x, self.min_y]),
+                ],
+            ]
+        )
 
     def __str__(self):
         return f"{[self.min_x, self.max_x, self.min_y, self.max_y]}"
@@ -420,7 +433,14 @@ class Cube(Bound):
 
     def combine(bounds):
 
-        min_x, max_x, min_y, max_y, min_z, max_z = math.inf, -math.inf, math.inf, -math.inf, math.inf, -math.inf
+        min_x, max_x, min_y, max_y, min_z, max_z = (
+            math.inf,
+            -math.inf,
+            math.inf,
+            -math.inf,
+            math.inf,
+            -math.inf,
+        )
 
         for b in bounds:
             if b.min_x < min_x:
@@ -442,7 +462,14 @@ class Cube(Bound):
 
     def combine_points(points):
 
-        min_x, max_x, min_y, max_y, min_z, max_z = math.inf, -math.inf, math.inf, -math.inf, math.inf, -math.inf
+        min_x, max_x, min_y, max_y, min_z, max_z = (
+            math.inf,
+            -math.inf,
+            math.inf,
+            -math.inf,
+            math.inf,
+            -math.inf,
+        )
 
         for p in points:
             x = p[0]
@@ -502,18 +529,19 @@ class Cube(Bound):
             return x_dist
 
         if btw_x:
-            return math.sqrt(y_dist ** 2 + z_dist ** 2)
+            return math.sqrt(y_dist**2 + z_dist**2)
 
         if btw_y:
-            return math.sqrt(x_dist ** 2 + z_dist ** 2)
+            return math.sqrt(x_dist**2 + z_dist**2)
 
         if btw_z:
-            return math.sqrt(x_dist ** 2 + y_dist ** 2)
+            return math.sqrt(x_dist**2 + y_dist**2)
 
-        return math.sqrt(x_dist ** 2 + y_dist ** 2 + z_dist ** 2)
+        return math.sqrt(x_dist**2 + y_dist**2 + z_dist**2)
 
     def get_facets(self):
-        vertices = np.array([
+        vertices = np.array(
+            [
                 np.array([self.min_x, self.min_y, self.min_z]),  # 0
                 np.array([self.max_x, self.min_y, self.min_z]),  # 1
                 np.array([self.min_x, self.max_y, self.min_z]),  # 2
@@ -522,32 +550,28 @@ class Cube(Bound):
                 np.array([self.min_x, self.max_y, self.max_z]),  # 5
                 np.array([self.max_x, self.min_y, self.max_z]),  # 6
                 np.array([self.max_x, self.max_y, self.max_z]),  # 7
-                ])
-        return [
-                # bottom plane
-                vertices[np.array([0, 1, 4])],
-                vertices[np.array([0, 4, 2])],
-
-                # left plane
-                vertices[np.array([0, 1, 6])],
-                vertices[np.array([0, 6, 3])],
-
-                # back plane
-                vertices[np.array([0, 2, 5])],
-                vertices[np.array([0, 5, 3])],
-
-                # right plane
-                vertices[np.array([2, 7, 5])],
-                vertices[np.array([2, 4, 7])],
-
-                # top plane
-                vertices[np.array([3, 7, 5])],
-                vertices[np.array([3, 6, 7])],
-
-                # front plane
-                vertices[np.array([4, 6, 1])],
-                vertices[np.array([4, 7, 6])],
             ]
+        )
+        return [
+            # bottom plane
+            vertices[np.array([0, 1, 4])],
+            vertices[np.array([0, 4, 2])],
+            # left plane
+            vertices[np.array([0, 1, 6])],
+            vertices[np.array([0, 6, 3])],
+            # back plane
+            vertices[np.array([0, 2, 5])],
+            vertices[np.array([0, 5, 3])],
+            # right plane
+            vertices[np.array([2, 7, 5])],
+            vertices[np.array([2, 4, 7])],
+            # top plane
+            vertices[np.array([3, 7, 5])],
+            vertices[np.array([3, 6, 7])],
+            # front plane
+            vertices[np.array([4, 6, 1])],
+            vertices[np.array([4, 7, 6])],
+        ]
 
     def __str__(self):
         return f"{[self.min_x, self.max_x, self.min_y, self.max_y, self.min_z, self.max_z]}"
@@ -607,24 +631,3 @@ class IndexPointer(Entry):
 
     def __repr__(self):
         return "pt " + f"{self.bound} -> {self.pointer}"
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

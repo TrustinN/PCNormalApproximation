@@ -21,17 +21,19 @@ class Plane():
 
         return p
 
-    def sampleNoise(self, num):
+    def sampleNoise(self, num, delta=1, ro=1):
         p = []
+        xyNF = self.noiseFactor * delta
+        zNF = self.noiseFactor * ro
 
         for i in range(num):
             theta = 2 * np.pi * np.random.random_sample()
             x = np.cos(theta) * self.radius * np.sqrt(np.random.random_sample())
             y = np.sin(theta) * self.radius * np.sqrt(np.random.random_sample())
 
-            p.append(np.array([x + self.noiseFactor * np.random.random_sample() - self.noiseFactor / 2,
-                               y + self.noiseFactor * np.random.random_sample() - self.noiseFactor / 2,
-                               self.noiseFactor * np.random.random_sample() - self.noiseFactor / 2]))
+            p.append(np.array([x + xyNF * np.random.random_sample() - xyNF / 2,
+                               y + xyNF * np.random.random_sample() - xyNF / 2,
+                               zNF * np.random.random_sample() - zNF / 2]))
 
         return p
 
